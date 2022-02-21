@@ -95,7 +95,20 @@ Server which manages token inside HashMap cache.
 - UI stores the custom JWT token inside local storage. 
 - UI Header Interceptor then places Authorization Bearer token in each server request to fetch user detials (fetched from Resource Server Github).
 
+![oAuth Sequence Diagram](/src/main/resources/images/oauth-sequence-diagram.png "oAuth Sequence Diagram")
+
+![oAuth Flow Diagram](/src/main/resources/images/oauth-flow-diagram.png "oAuth Flow Diagram")
+
 ## Mock oAuth without UI
+
+- Assume that you have not logged in on the UI. 
+- In such case UI will redirect you from http://localhost:4200 to http://localhost:8080/oauth2/authorization/github.
+- First step is to open http://localhost:8080/oauth2/authorization/github in your browser.
+- Browser will redirect you to https://github.com/login/oauth/authorize for Authorization.
+- After authorization, you will be redirected to callback URL http://localhost:4200/callback?code=bcefb0ed1d7c0989b8fe&state=IqHwplkrlD8G67533Rea_tg9sabUMSuXd2b9YQL1La4%3D
+- Second step is to copy the code and state parameters from the above callback URL and place them in this URL http://localhost:8080/login/oauth2/code/github?code=bcefb0ed1d7c0989b8fe&state=IqHwplkrlD8G67533Rea_tg9sabUMSuXd2b9YQL1La4%3D
+- Third step is to open this URL in a new browser tab. You will get back an access Token.
+- Fourth step is to place this access token under Header > Authorization of the Thunderclient request exported under resource folder.
 
 ## Scalability
 
