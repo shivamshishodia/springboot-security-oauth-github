@@ -53,7 +53,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             /** Use HashMap to hold the OAuthRequest in-memmory */
             .authorizationRequestRepository(new InMemoryRequestRepository())
             .and()
-            /** Upon success, the auth object will be converted to JWT token. */
+            /** Upon success, the auth object (Github principals) will be saved in 
+             * a HashMap cache along with the generated JWT token [key-value pairs]. 
+            */
             .successHandler(this::successHandler)
             .and()
             /** Unauthenticated request will be shown 401 unauthorized error. */

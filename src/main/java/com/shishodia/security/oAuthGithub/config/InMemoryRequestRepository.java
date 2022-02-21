@@ -14,6 +14,7 @@ public class InMemoryRequestRepository implements AuthorizationRequestRepository
 
     private final Map<String, OAuth2AuthorizationRequest> cache = new HashMap<>();
 
+    /** Holds the OAuth request temporarily in-memory while the Github request is being made. */
     @Override
     public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
         /** If the request contains 'state' parameter, remove it from the cache and return the removed cache value. */

@@ -28,7 +28,7 @@ public class TokenStore {
         return token;
     }
 
-    /** Fetch the token available in the hashmap cache. */
+    /** Fetch the token available in the hashmap cache for TokenFilter so that it can grant HTTP request access. */
     public Authentication getAuth(String token) {
         return cache.getOrDefault(token, null);
     }

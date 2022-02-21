@@ -1,15 +1,16 @@
 # Spring boot Security oAuth (using Github)
 
-Basic Spring boot Security OAuth (using Github). Angular code is not covered here, but the calls are mocked using Thunderclient requests.
+Basic Spring boot Security OAuth (using Github). Angular code is not covered here, but the calls are mocked using Thunderclient requests (check 'Mock oAuth without UI').
 
 ## Overview of Components
 
 - Spring boot Backend Service (uses Github OAuth)
-  - TokenStore: Generate token from/to authentication.
-  - SecurityConfig.successHandler: Generate the token using the TokenStore call and return the token in the response to clients on auth success.
+  - TokenStore: Generate token from/for authentication.
+  - TokenFilter: Filters and validates the Auth Bearer tokens coming in HTTP requests using JWT Hashmap cache.
+  - SecurityConfig.successHandler: Generate the token using the TokenStore call and return the access token in the response to clients on auth success.
   - SecurityConfig.authenticationEntryPoint: Unauthenticated request will be shown 401 unauthorized error.
   - SecurityConfig.corsConfiguration: Allow XHR requests.
-  - InMemoryRequestRepository: Use HashMap to hold the OAuthRequest in-memmory temporarily while the request is begin processed by Github.
+  - InMemoryRequestRepository: Use HashMap to hold the OAuthRequest in-memory temporarily while the request is begin processed by Github.
   - HomeController.username: Get the username.
 - Angular Client (Mocked via Thunderclient)
   - Login Component: Show the login button.
@@ -35,21 +36,21 @@ Basic Spring boot Security OAuth (using Github). Angular code is not covered her
 ## SecurityConfig Class
 
 - `config.SecurityConfig` class extends `WebSecurityConfigurerAdapter` and uses `@EnableWebSecurity`.
-- Configuration allows access to oAuth and login URLs without the need of authentication. Any other request to the URIs should be authenticated.
-- Upon success, the auth object will be converted to JWT token via `TokenStore`class. Unauthenticated request will be shown 401 unauthorized error.
-- The authorization requests are stored in-memory using HashMap for now by `config.InMemoryRequestRepository` class.
+- Configuration allows access to oAuth and login URIs without the need of authentication. Any other request to the URIs should be authenticated.
+- Upon success, the auth object (Github principals) will be saved in a HashMap cache along with the generated JWT token [key-value pairs]. JWT token is generated via `TokenStore` class. Unauthenticated request will be shown 401 unauthorized error.
+- The authorization requests to Github are stored temporarily in-memory using HashMap by `config.InMemoryRequestRepository` class.
 
 ## Token Store Class
 
-- We can define our own custom method to generate the JWTs. This is covered under `config.TokenStore` class.
-- `config.SecurityConfig.successHandler()` (When oAuth is successful) calls `config.TokenStore` to create custom token store (generates JWT and store it in Hashmap cache).
+- As this is a Authorization server assisting Github (Resource Server), we can define our own custom method to generate the JWTs. This is covered under `config.TokenStore` class.
+- `config.SecurityConfig.successHandler()` (When oAuth is successful) calls `config.TokenStore` to create custom token store (generates JWT and store it in Hashmap cache along with user's Github principals).
 
 ## Token Filter Class
 
 - The `TokenFilter` class extends `OncePerRequestFilter`. 
-- It checks the authorization token in the header. 
+- It checks the authorization token in the header of each HTTP request. 
 - If the authorization token is found, it spilts the 'Bearer' part away.
-- After this we check if the token is present in the Token Store. 
+- After this we check if the token is present in the Token Store (HashMap cache). 
 - If yes, we place it inside the security context.
 
 ## InMemoryRequestRepository Class
@@ -82,18 +83,19 @@ Server which manages token inside HashMap cache.
 - The user visits the UI hosted on http://localhost:4200/home. [This project does not have the UI component]
 - The UI > AuthGaurd checks if the user is authenticated. If yes he is redirected to http://localhost:4200/home.
 - If the user is not authenticated, AuthGaurd redirects the user to our Spring boot service URL http://localhost:8080/oauth2/authorization/github.
-- http://localhost:8080/oauth2/authorization/github build the URL and further redirects the user to https://github.com/login/oauth/authorize.
+- http://localhost:8080/oauth2/authorization/github builds the URL and further redirects the user to https://github.com/login/oauth/authorize.
 - The user grants access to the user on Github.
-- Github then redirects to the UI callback URL with the `state` and `code` parameters http://localhost:4200/callback?code=693c1a4f4feba855856d&state=OeAR4rYKywzIry-4HsSQCjsPXNPdOuXoAXz_dsbD9GA%3D
-- UI further redirect the `state` and `code` parameters to our Spring boot service URL http://localhost:8080/login/oauth2/code/github?code=693c1a4f4feba855856d&state=OeAR4rYKywzIry-4HsSQCjsPXNPdOuXoAXz_dsbD9GA%3D
-- Our Springboot service get back the `accessToken` and builds its own JWT token using it. This custom token is then returned to the UI.
+- Github then redirects to the UI callback URL with the `state` and `code` parameters http://localhost:4200/callback?code=<YOUR_CODE>&state=<YOUR_STATE>
+- UI further redirects the `state` and `code` parameters to our Spring boot service URL http://localhost:8080/login/oauth2/code/github?code=<YOUR_CODE>&state=<YOUR_STATE>
+- Our Springboot service gets the user principals from Github and generates its own JWT token. This token is mapped to user principals and saved inside HashMap. The access token is then returned back to the UI.
   
 ```
 {accessToken: "353f02d2-e804-49bf-8257-73af6bc1597e"}
 ```
 
-- UI stores the custom JWT token inside local storage. 
-- UI Header Interceptor then places Authorization Bearer token in each server request to fetch user detials (fetched from Resource Server Github).
+- UI stores the custom JWT access token inside local storage on the client side. 
+- UI header interceptor then places authorization bearer token in each server request to fetch user details.
+- Spring boot service (TokenFilter) validates access token in the Hashmap and provides the relevant user data fetched from Github.
 
 ![oAuth Sequence Diagram](/src/main/resources/images/oauth-sequence-diagram.png "oAuth Sequence Diagram")
 
@@ -105,13 +107,14 @@ Server which manages token inside HashMap cache.
 - In such case UI will redirect you from http://localhost:4200 to http://localhost:8080/oauth2/authorization/github.
 - First step is to open http://localhost:8080/oauth2/authorization/github in your browser.
 - Browser will redirect you to https://github.com/login/oauth/authorize for Authorization.
-- After authorization, you will be redirected to callback URL http://localhost:4200/callback?code=bcefb0ed1d7c0989b8fe&state=IqHwplkrlD8G67533Rea_tg9sabUMSuXd2b9YQL1La4%3D
-- Second step is to copy the code and state parameters from the above callback URL and place them in this URL http://localhost:8080/login/oauth2/code/github?code=bcefb0ed1d7c0989b8fe&state=IqHwplkrlD8G67533Rea_tg9sabUMSuXd2b9YQL1La4%3D
-- Third step is to open this URL in a new browser tab. You will get back an access Token.
+- After authorization, you will be redirected to callback URL http://localhost:4200/callback?code=<YOUR_CODE>&state=<YOUR_STATE>
+- Second step is to copy the code and state parameters from the above callback URL and place them in this URL http://localhost:8080/login/oauth2/code/github?code=<YOUR_CODE>&state=<YOUR_STATE>
+- Third step is to open this URL in a new browser tab. You will get back an access token.
 - Fourth step is to place this access token under Header > Authorization of the Thunderclient request exported under resource folder.
+- Send the request and you will get the username from our Authorization service.
 
 ## Scalability
 
 - The HashMap cache contains key-value pairs of JWT token and Github User Principals. 
 - As requests grow, key-value pairs for each token can be fetched easily.
-- We can have many users, each of them will have their own Github User Principals inside this Spring boot service (Authorization server) and access token will be maintained by the UI inside the local storage.
+- We can have many users, each of them will have their own Github User Principals inside this Spring boot service (Authorization server) and access token will be maintained by the UI inside the local storage by each user.
